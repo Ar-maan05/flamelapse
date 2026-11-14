@@ -1,0 +1,37 @@
+# lz4 across ten years: fast compression, strong compression and decompression of one fixed file.
+name = "lz4"
+repo = "https://github.com/lz4/lz4"
+since = "v1.7.3"
+samples = 60
+jobs = 3
+
+[build]
+command = "make -C programs -j$(nproc) lz4 CFLAGS='-O3 -g -fno-omit-frame-pointer'"
+binary = "programs/lz4"
+
+# input.bin is 3.5 MB of JSON, English-like text and random bytes. -9 gets a 256 KB slice
+# so it does not drown out the other two. Newer lz4 is multi-threaded; -T1 keeps it comparable.
+[[run]]
+name = "Fast compression"
+command = "{bin} $({plainbin} -h 2>&1 | grep -q -- -T# && echo -T1) -1 -c -f {here}/input.bin"
+show = "lz4 -1 -c input.bin"
+
+[[run]]
+name = "Strong compression"
+command = "{bin} $({plainbin} -h 2>&1 | grep -q -- -T# && echo -T1) -9 -c -f {here}/input-small.bin"
+show = "lz4 -9 -c input-small.bin"
+
+[[run]]
+name = "Decompression"
+command = "{bin} $({plainbin} -h 2>&1 | grep -q -- -T# && echo -T1) -d -c -f {here}/input.lz4"
+show = "lz4 -d -c input.lz4"
+
+check = "{bin} -d -c {here}/input.lz4 | cmp -s - {here}/input.bin"
+
+[[category]]
+label = "Checksums"
+match = '^(LZ4_)?XXH\w+$'
+description = "xxHash checks that guard against corrupted data."
+
+[report]
+intro = "Every version was built from source and run three times on the same input: a 3.5 MB mix of JSON, English-like text and random bytes (strong compression gets a 256 KB slice so it does not drown out the rest)."

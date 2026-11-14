@@ -1,0 +1,5 @@
+map(select(.score > 20))
+| map({id, name, total: (.nested.b | add), tags: (.tags | join(","))})
+| group_by(.total % 10)
+| map({k: (.[0].total % 10), n: length, top: (sort_by(.total) | reverse | .[0:3] | map(.name))})
+| tojson | fromjson | length

@@ -1,0 +1,10 @@
+.venv
+.git
+build
+*.egg-info
+_prototype
+try-*
+examples/*/.flamelapse
+examples/*/flamelapse-report
+**/__pycache__
+.pytest_cache

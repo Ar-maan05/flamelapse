@@ -1,0 +1,69 @@
+# jq from 1.5 (2015) to today, running one filter over a 2.9 MB JSON file.
+name = "jq"
+repo = "https://github.com/jqlang/jq"
+since = "jq-1.5"
+samples = 60
+jobs = 3
+
+[build]
+# Oniguruma is left out so old and new versions build the same way; the filter does not use regexes.
+command = """
+autoreconf -fi
+ONIG=; grep -q builtin configure.ac && ONIG=--with-oniguruma=no
+./configure -q --disable-docs --disable-maintainer-mode --disable-shared --enable-static $ONIG
+make src/builtin.inc >/dev/null 2>&1; make -j$(nproc) || make
+"""
+binary = "jq"
+# pow10 was removed from glibc in 2018; old jq still calls it. exp10 is the same function.
+env = { CFLAGS = "-O2 -g -fno-omit-frame-pointer -w -std=gnu99 -fpermissive -Dpow10=exp10" }
+
+[[run]]
+name = "main"
+command = "{bin} -f {here}/jq.filter {here}/input.json"
+
+check = "test \"$({bin} -f {here}/jq.filter {here}/input.json)\" = 10"
+
+# jq-specific kinds of work. Memory is checked on the innermost function; the rest anywhere on the stack.
+[[category]]
+label = "Memory"
+where = "leaf"
+match = '^(malloc|free|realloc|calloc|cfree|_int_\w+|jv_mem_\w+|jv_free|jvp_\w+_free|\w+_free|tcache\w*|malloc_\w+|unlink_chunk|sysmalloc|__libc_\w+|alloc_perturb|jvp_refcnt_\w+)$'
+description = "Asking for memory and giving it back. Every value jq creates has to be freed later."
+
+[[category]]
+label = "Reading JSON"
+match = '^(jq_util_input_next_input|jv_parse\w*|jv_parser\w*|jv_load\w*)$'
+description = "Turning the input file into values jq can work with."
+
+[[category]]
+label = "Sorting and grouping"
+match = '^(f_sort\w*|f_group_by\w*|jv_sort|jv_group|sort_items|\w*sort_by\w*|f_unique\w*|f_min\w*|f_max\w*)$'
+description = "sort_by and group_by: comparing values and putting them in order."
+
+[[category]]
+label = "Writing JSON"
+match = '^(jv_dump\w*|f_tojson|jv_dumpf|jv_dump_term)$'
+description = "Turning values back into JSON text."
+
+[[category]]
+label = "Starting up"
+match = '^(jq_compile\w*|load_program|builtins_bind|block_\w+|gen_\w+|yyparse|jq_parse\w*)$'
+description = "Loading built-in functions and compiling the filter before any data is read."
+
+[[category]]
+label = "Running the jq program"
+match = '^(jq_next|process|jq_start)$'
+description = "The interpreter stepping through the filter: selecting, mapping, building results."
+
+[notes]
+"e17ccf2297" = "join was changed to also accept numbers and booleans. It is written in jq's own language, so the extra checks run for every single element joined."
+"143e8dc5e4" = "About 300 lines of built-in functions moved from C into jq's own language. jq now has to compile them every time it starts."
+"1c806b74ea" = "A new builtins feature changed how built-in functions are registered, which added work every time jq starts."
+"b142d484d5" = "A correctness fix to how if-then-else is compiled. Right answers, slightly more work per step."
+"88613f5469" = "jq got smarter about wiring up its built-in functions at startup, skipping work it did not need."
+"cf4b48c7ba" = "jq started keeping the exact original text of every number so it can print it back unchanged. More precise output, but more memory and work per number."
+"33d7bce321" = "A fix for a crash on extremely deeply nested data changed how jq frees memory. The crash is gone, but freeing ordinary data got much slower too. A fix is proposed in jq PR #3729."
+"9a75bb0d43" = "join stopped copying the whole result string for every element it added. That undid most of the 2015 slowdown."
+
+[report]
+intro = "Every version was built from source and run on the same 2.9 MB JSON file with this filter:"

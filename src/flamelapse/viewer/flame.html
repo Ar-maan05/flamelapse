@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flamelapse</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Crect x='1' y='15' width='20' height='5' rx='1.5' fill='%232a78d6'/%3E%3Crect x='3' y='9' width='11' height='5' rx='1.5' fill='%23eb6834'/%3E%3Crect x='5' y='3' width='6' height='5' rx='1.5' fill='%231baf7a'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=IBM+Plex+Sans+Condensed:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #1B2333;
+  --bg-raise: #232D41;
+  --line: #34405A;
+  --text: #ECE6DA;
+  --muted: #9AA3B5;
+  --steady: #CDBEA6;
+  --hot: #FF5A36;
+  --warm: #FFB000;
+  --cool: #49A9D9;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text);
+  font-family: "IBM Plex Sans Condensed", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+body { display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: auto minmax(420px, 1fr) auto;
+  grid-template-areas: "head side" "stage side" "foot side"; height: 100vh; }
+header { grid-area: head; display: grid; grid-template-columns: 1fr auto; gap: 6px 24px; padding: 18px 24px 4px; align-items: start; }
+#stage { grid-area: stage; position: relative; min-height: 0; }
+footer { grid-area: foot; padding: 6px 24px 16px; }
+aside { grid-area: side; border-left: 1px solid var(--line); background: var(--bg-raise); overflow-y: auto; padding: 18px 20px 24px; }
+
+.title { font-size: 15px; color: var(--muted); }
+.title b { color: var(--text); font-weight: 700; font-size: 22px; margin-right: 10px; letter-spacing: -0.01em; }
+.howto { grid-column: 1; font-size: 14px; color: var(--muted); max-width: 72ch; line-height: 1.45; margin: 0; }
+.commit { grid-column: 1; font-size: 17px; line-height: 1.35; max-width: 70ch; min-height: 2.7em; margin-top: 6px; }
+.commit .sha { font-family: "IBM Plex Mono", monospace; font-size: 13px; color: var(--muted); margin-right: 8px; }
+.commit .tag { color: var(--warm); font-weight: 500; margin-right: 8px; }
+.total { grid-column: 2; grid-row: 1 / span 3; text-align: right; }
+.total .num { font-size: 44px; font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
+.total .unit { font-size: 14px; color: var(--muted); }
+.total .delta { font-size: 15px; min-height: 1.3em; margin-top: 2px; }
+.total .hint { font-size: 13px; color: var(--muted); }
+
+#flame { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: pointer; }
+#tip { position: absolute; pointer-events: none; background: var(--bg); border: 1px solid var(--line);
+  padding: 8px 10px; font-size: 14px; max-width: 420px; display: none; line-height: 1.4; z-index: 2; }
+#tip .fn { font-weight: 700; word-break: break-all; }
+#tip .m { color: var(--muted); }
+
+.controls { display: flex; gap: 10px; align-items: center; margin-bottom: 4px; flex-wrap: wrap; }
+button, select { font: inherit; font-size: 14px; color: var(--text); background: var(--bg-raise);
+  border: 1px solid var(--line); padding: 5px 12px; cursor: pointer; }
+button:hover, select:hover { border-color: var(--muted); }
+:focus-visible { outline: 2px solid var(--warm); outline-offset: 2px; }
+#play { min-width: 76px; }
+.legend { margin-left: auto; display: flex; gap: 14px; font-size: 13px; color: var(--muted); align-items: center; flex-wrap: wrap; }
+.legend i { display: inline-block; width: 12px; height: 12px; margin-right: 5px; vertical-align: -1px; }
+.tl-label { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--muted); margin-top: 8px; }
+.tl-label i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--hot); margin-right: 5px; }
+#timeline { width: 100%; height: 64px; display: block; cursor: pointer; }
+
+aside h2 { font-size: 16px; font-weight: 700; margin: 0 0 4px; }
+aside .sub { font-size: 13px; color: var(--muted); margin: 0 0 12px; line-height: 1.4; }
+aside section + section { margin-top: 26px; }
+#changes { list-style: none; margin: 0; padding: 0; }
+#changes button { display: grid; grid-template-columns: 62px 1fr; gap: 2px 10px; width: 100%; text-align: left;
+  background: none; border: 0; border-top: 1px solid var(--line); padding: 9px 4px; }
+#changes button:hover, #changes button[aria-current="true"] { background: rgba(236,230,218,0.06); }
+#changes .pct { font-weight: 700; font-size: 16px; grid-row: span 2; }
+#changes .what { font-size: 14px; line-height: 1.35; }
+#changes .where { font-size: 13px; color: var(--muted); grid-column: 2; }
+#changes .where code { font-family: inherit; color: var(--text); }
+#fn-empty { font-size: 14px; color: var(--muted); line-height: 1.45; margin: 0; }
+#fn-panel[hidden], #fn-empty[hidden] { display: none; }
+#fn-name { font-weight: 700; font-size: 15px; word-break: break-all; }
+#fn-stats { font-size: 13px; color: var(--muted); margin: 2px 0 8px; line-height: 1.4; }
+#fn-spark { width: 100%; height: 70px; display: block; }
+#fn-clear { margin-top: 8px; font-size: 13px; padding: 3px 10px; }
+details { font-size: 14px; line-height: 1.45; color: var(--muted); }
+summary { cursor: pointer; color: var(--text); font-weight: 500; }
+details pre { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); padding: 8px; white-space: pre-wrap; margin: 8px 0; }
+
+@media (max-width: 960px) {
+  body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 60vh auto auto;
+    grid-template-areas: "head" "stage" "foot" "side"; height: auto; }
+  aside { border-left: 0; border-top: 1px solid var(--line); }
+}
+@media (max-width: 640px) {
+  header { grid-template-columns: 1fr; padding: 14px 16px 4px; }
+  .total { grid-column: 1; grid-row: auto; text-align: left; }
+  .total .num { font-size: 32px; }
+  footer { padding: 6px 16px 14px; }
+  aside { padding: 16px; }
+  .legend { margin-left: 0; }
+  .tl-label { flex-direction: column; gap: 2px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="title"><a href="index.html" id="home" style="color:inherit;text-decoration:none"><b>Flamelapse</b></a><span id="proj"></span></div>
+  <p class="howto">Each bar is a function. Its width is how much work it does on the benchmark, and it sits on top of the function that called it. Press Play to watch the code change commit by commit.</p>
+  <div class="commit" id="commit"></div>
+  <div class="total">
+    <div><span class="num" id="tot">-</span> <span class="unit">instructions</span></div>
+    <div class="delta" id="delta"></div>
+    <div class="hint">Total work for one run. Lower is faster.</div>
+  </div>
+</header>
+
+<div id="stage"><canvas id="flame" aria-label="Flame graph of the selected commit. Click a bar to follow that function."></canvas><div id="tip"></div></div>
+
+<footer>
+  <div class="controls">
+    <button id="play">Play</button>
+    <select id="speed" aria-label="Playback speed"><option value="1400">Slow</option><option value="700" selected>Normal</option><option value="300">Fast</option></select>
+    <select id="scale" aria-label="Bar width">
+      <option value="abs" selected>Bar width: instructions</option>
+      <option value="rel">Bar width: share of the run</option>
+    </select>
+    <div class="legend" aria-label="Colour key">
+      <span><i style="background:var(--cool)"></i>Faster than previous commit</span>
+      <span><i style="background:var(--steady)"></i>About the same</span>
+      <span><i style="background:var(--hot)"></i>Slower</span>
+    </div>
+  </div>
+  <div class="tl-label"><span>Total instructions per commit, oldest to newest</span><span><i></i>Change traced to one commit</span></div>
+  <canvas id="timeline" tabindex="0" aria-label="Commit timeline. Click or use the arrow keys to move between commits."></canvas>
+</footer>
+
+<aside>
+  <section>
+    <h2>Follow a function</h2>
+    <p id="fn-empty">Click any bar to see how that function's cost changed over time. Every bar for it gets outlined.</p>
+    <div id="fn-panel" hidden>
+      <div id="fn-name"></div>
+      <div id="fn-stats"></div>
+      <canvas id="fn-spark" aria-hidden="true"></canvas>
+      <button id="fn-clear">Stop following</button>
+    </div>
+  </section>
+  <section>
+    <h2>Biggest changes</h2>
+    <p class="sub">Commits that moved the total by 2% or more. Pick one to jump there.</p>
+    <ul id="changes"></ul>
+  </section>
+  <section>
+    <details>
+      <summary>About this benchmark</summary>
+      <p id="workload-intro"></p>
+      <pre id="workload"></pre>
+      <p>Costs are counted CPU instructions from Valgrind's callgrind, not timings, so two runs of the same commit agree to within 0.02%. A change here is a real change in the code, not noise.</p>
+      <p>Commits between the ones shown were measured too, so a jump marked "in this commit" is pinned to that exact commit.</p>
+    </details>
+  </section>
+</aside>
+
+
+<script src="projects.js"></script>
+<script>
+const PROJ = new URLSearchParams(location.search).get('p') || ((window.FLAMELAPSE_PROJECTS || [])[0] || {}).key;
+const loader = document.createElement('script'); loader.src = `data-${PROJ}.js`; loader.onload = () => start(); document.head.append(loader);
+function start() {
+document.getElementById('home').href = `index.html?p=${PROJ}`;
+const D = window.FLAMELAPSE;
+const F = D.frames, N = F.length;
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const C = { steady: css('--steady'), hot: css('--hot'), warm: css('--warm'), cool: css('--cool'),
+  text: css('--text'), muted: css('--muted'), line: css('--line'), bg: css('--bg') };
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $ = id => document.getElementById(id);
+
+// Tree, children sorted by name so bars keep their place across commits.
+const nodes = D.nodes.map(([name, parent, vals], i) => ({ i, name, parent, vals, kids: [] }));
+const roots = [];
+for (const n of nodes) (n.parent < 0 ? roots : nodes[n.parent].kids).push(n);
+const byName = (a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+for (const n of nodes) n.kids.sort(byName);
+roots.sort(byName);
+for (const n of nodes) n.self = n.vals.map((v, i) => v - n.kids.reduce((s, k) => s + k.vals[i], 0));
+const depthOf = n => n.parent < 0 ? 0 : 1 + depthOf(nodes[n.parent]);
+const maxTotal = Math.max(...F.map(f => f.total)), minTotal = Math.min(...F.map(f => f.total));
+const maxDepth = Math.max(...nodes.filter(n => n.vals.some((v, i) => v > 0.005 * F[i].total)).map(depthOf)) + 1;
+// Inclusive cost of a function per commit, counting recursive calls once.
+const fnTotal = name => { const t = new Array(N).fill(0);
+  const walk = (list, inside) => { for (const n of list) { const hit = n.name === name;
+    if (hit && !inside) n.vals.forEach((v, i) => t[i] += v); walk(n.kids, inside || hit); } };
+  walk(roots, false); return t; };
+
+$('proj').textContent = `${D.project}, ${N} commits from ${F[0].date.slice(0, 4)} to ${F[N - 1].date.slice(0, 4)}`;
+$('workload').textContent = D.workload;
+$('workload-intro').textContent = D.about.workload_intro;
+
+let pos = 0, playing = false, last = 0, hover = null, follow = null, rects = [];
+const fl = $('flame'), tl = $('timeline'), sp = $('fn-spark');
+const fx = fl.getContext('2d'), tx = tl.getContext('2d'), sx = sp.getContext('2d');
+const lerp = (a, b, t) => a + (b - a) * t;
+const at = (arr, p) => { const i = Math.floor(p), t = p - i; return i >= N - 1 ? arr[N - 1] : lerp(arr[i], arr[i + 1], t); };
+const totals = F.map(f => f.total);
+const pct = (a, b) => (b - a) / a * 100;
+const fmtPct = r => `${r > 0 ? '+' : ''}${r.toFixed(1)}%`;
+const fmt = v => v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : Math.round(v / 1e3) + 'K';
+const month = d => new Date(d).toLocaleDateString('en', { month: 'short', year: 'numeric' });
+const day = d => new Date(d).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' });
+
+function mix(a, b, t) {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const ch = s => Math.round(lerp((pa >> s) & 255, (pb >> s) & 255, t));
+  return `rgb(${ch(16)},${ch(8)},${ch(0)})`;
+}
+function colorFor(n, p) {
+  const i = Math.max(1, Math.min(N - 1, Math.round(p)));
+  const a = n.vals[i - 1], b = n.vals[i];
+  if (!a && !b) return C.steady;
+  if (!a) return C.warm;
+  const r = Math.log2((b || 1) / a);
+  if (Math.abs(r) < 0.03) return C.steady;
+  if (r > 0) return r > 0.6 ? mix(C.warm, C.hot, Math.min(1, (r - 0.6) / 0.6)) : mix(C.steady, C.warm, r / 0.6);
+  return mix(C.steady, C.cool, Math.min(1, -r / 0.6));
+}
+
+// Biggest changes, each with the functions whose own cost moved the most.
+function drivers(i) {
+  const d = new Map();
+  for (const n of nodes) d.set(n.name, (d.get(n.name) || 0) + n.self[i] - n.self[i - 1]);
+  const sign = Math.sign(F[i].total - F[i - 1].total);
+  return [...d].filter(([, v]) => Math.sign(v) === sign).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 2).map(([k]) => k);
+}
+const changes = [];
+for (let i = 1; i < N; i++) { const r = pct(F[i - 1].total, F[i].total); if (Math.abs(r) >= 2) changes.push({ i, r }); }
+changes.sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
+const list = $('changes');
+for (const c of changes) {
+  const f = F[c.i], li = document.createElement('li'), b = document.createElement('button');
+  const p = document.createElement('span'); p.className = 'pct'; p.textContent = fmtPct(c.r); p.style.color = c.r > 0 ? C.hot : C.cool;
+  const w = document.createElement('span'); w.className = 'what';
+  w.textContent = f.direct ? f.subject : `Somewhere between ${day(F[c.i - 1].date)} and ${day(f.date)}`;
+  const wh = document.createElement('span'); wh.className = 'where';
+  wh.append(`${month(f.date)}${f.direct ? '' : ', not pinned to one commit'}. Mostly in `);
+  drivers(c.i).forEach((nm, k) => { if (k) wh.append(' and '); const code = document.createElement('code'); code.textContent = nm; wh.append(code); });
+  b.append(p, w, wh); b.dataset.i = c.i;
+  b.onclick = () => { setPlaying(false); pos = c.i; draw(); };
+  li.append(b); list.append(li);
+}
+
+function size(c) {
+  const dpr = devicePixelRatio || 1, r = c.getBoundingClientRect();
+  c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr);
+  c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+  return r;
+}
+let FW = 0, FH = 0, TW = 0, TH = 0, SW = 0, SH = 0, ROW = 18;
+function resize() {
+  ({ width: FW, height: FH } = size(fl)); ({ width: TW, height: TH } = size(tl));
+  if (!$('fn-panel').hidden) ({ width: SW, height: SH } = size(sp));
+  ROW = Math.max(15, Math.min(30, Math.floor((FH - 12) / maxDepth)));
+  draw();
+}
+
+function drawFlame() {
+  fx.clearRect(0, 0, FW, FH);
+  rects = [];
+  const pad = 24, W = FW - pad * 2;
+  const scale = $('scale').value === 'abs' ? maxTotal : at(totals, pos);
+  fx.font = '500 12px "IBM Plex Sans Condensed", sans-serif';
+  fx.textBaseline = 'middle';
+  const outlines = [];
+  const walk = (list, x, depth) => {
+    for (const n of list) {
+      const w = at(n.vals, pos) / scale * W;
+      if (w >= 0.4) {
+        const y = FH - 6 - (depth + 1) * ROW;
+        if (y > -ROW) {
+          fx.globalAlpha = follow && n.name !== follow ? 0.35 : 1;
+          fx.fillStyle = colorFor(n, pos);
+          fx.fillRect(x, y, Math.max(0.5, w - 0.5), ROW - 1);
+          if (w > 34) {
+            fx.fillStyle = C.bg;
+            let label = n.name; const max = Math.floor((w - 8) / 6.2);
+            if (label.length > max) label = label.slice(0, Math.max(1, max - 1)) + '..';
+            fx.fillText(label, x + 4, y + ROW / 2);
+          }
+          fx.globalAlpha = 1;
+          if (n === hover || (follow && n.name === follow)) outlines.push([x, y, w]);
+          rects.push({ n, x, y, w });
+        }
+        walk(n.kids, x, depth + 1);
+      }
+      x += w;
+    }
+  };
+  walk(roots, pad, 0);
+  fx.strokeStyle = C.text; fx.lineWidth = 1.5;
+  for (const [x, y, w] of outlines) fx.strokeRect(x + 0.75, y + 0.75, Math.max(1, w - 2), ROW - 2.5);
+}
+
+function drawTimeline() {
+  tx.clearRect(0, 0, TW, TH);
+  const top = 14, h = TH - top - 4;
+  const xs = i => (N === 1 ? 0 : i / (N - 1)) * TW;
+  const lo = minTotal - (maxTotal - minTotal) * 0.25, ys = v => top + h - ((v - lo) / (maxTotal - lo)) * h;
+  const path = () => { tx.beginPath(); F.forEach((f, i) => i ? tx.lineTo(xs(i), ys(f.total)) : tx.moveTo(xs(i), ys(f.total))); };
+  path(); tx.lineTo(TW, top + h); tx.lineTo(0, top + h); tx.closePath();
+  tx.fillStyle = 'rgba(205,190,166,0.16)'; tx.fill();
+  path(); tx.strokeStyle = C.steady; tx.lineWidth = 1.5; tx.stroke();
+  tx.font = '500 11px "IBM Plex Sans Condensed", sans-serif'; tx.textBaseline = 'top';
+  let lastLabel = -1e9;
+  F.forEach((f, i) => {
+    if (!f.tag) return;
+    const x = xs(i);
+    tx.fillStyle = C.warm; tx.fillRect(x - 0.5, top, 1, h);
+    if (x - lastLabel > 48) { tx.fillText(f.tag, Math.min(x + 3, TW - 34), 0); lastLabel = x; }
+  });
+  for (const c of changes) {
+    if (!F[c.i].direct) continue;
+    tx.beginPath(); tx.arc(xs(c.i), ys(F[c.i].total), 3.5, 0, Math.PI * 2);
+    tx.fillStyle = c.r > 0 ? C.hot : C.cool; tx.fill();
+  }
+  tx.fillStyle = C.text; tx.fillRect(xs(pos) - 1, top - 2, 2, h + 4);
+}
+
+function drawFollow() {
+  if (!follow) return;
+  const t = fnTotal(follow), i = Math.round(pos);
+  const first = t.findIndex(v => v > 0);
+  $('fn-name').textContent = follow;
+  $('fn-stats').textContent = t[i]
+    ? `${fmt(t[i])} instructions in this commit, ${(t[i] / F[i].total * 100).toFixed(1)}% of the run.`
+      + (first >= 0 && first < i ? ` ${fmtPct(pct(t[first], t[i]))} since ${month(F[first].date)}.` : '')
+    : 'Not called in this commit, or too small to show.';
+  sx.clearRect(0, 0, SW, SH);
+  const mx = Math.max(...t) || 1, xs = k => k / (N - 1) * SW, ys = v => SH - 4 - v / mx * (SH - 10);
+  sx.beginPath(); t.forEach((v, k) => k ? sx.lineTo(xs(k), ys(v)) : sx.moveTo(xs(k), ys(v)));
+  sx.strokeStyle = C.warm; sx.lineWidth = 1.5; sx.stroke();
+  sx.fillStyle = C.text; sx.fillRect(xs(pos) - 1, 0, 2, SH);
+}
+
+function drawHeader() {
+  const i = Math.round(pos), f = F[i];
+  $('tot').textContent = fmt(at(totals, pos));
+  const c = $('commit');
+  c.replaceChildren();
+  if (f.tag) { const t = document.createElement('span'); t.className = 'tag'; t.textContent = f.tag; c.append(t); }
+  const s = document.createElement('span'); s.className = 'sha'; s.textContent = f.sha.slice(0, 8) + ' ' + f.date.slice(0, 10); c.append(s);
+  c.append(document.createTextNode(f.subject));
+  const d = $('delta');
+  if (i > 0) {
+    const r = pct(F[i - 1].total, f.total);
+    d.textContent = Math.abs(r) < 0.05 ? 'No change from previous commit' : f.direct ? `${fmtPct(r)} in this commit` : `${fmtPct(r)} since ${F[i - 1].date.slice(0, 10)}`;
+    d.style.color = Math.abs(r) < 0.05 ? C.muted : r > 0 ? C.hot : C.cool;
+  } else { d.textContent = 'First commit shown'; d.style.color = C.muted; }
+  for (const b of list.querySelectorAll('button')) b.setAttribute('aria-current', String(+b.dataset.i === i));
+}
+
+function draw() { drawFlame(); drawTimeline(); drawHeader(); drawFollow(); }
+
+function tick(t) {
+  if (!playing) return;
+  if (last) pos = Math.min(N - 1, pos + (t - last) / +$('speed').value);
+  last = t;
+  if (pos >= N - 1) setPlaying(false);
+  draw();
+  if (playing) requestAnimationFrame(tick);
+}
+function setPlaying(p) {
+  playing = p; last = 0;
+  $('play').textContent = p ? 'Pause' : 'Play';
+  if (p) { if (pos >= N - 1) pos = 0; reduceMotion ? stepLoop() : requestAnimationFrame(tick); }
+}
+// Reduced motion: step commit to commit without tweening.
+function stepLoop() { if (!playing) return; pos = Math.min(N - 1, Math.floor(pos) + 1); draw();
+  if (pos >= N - 1) setPlaying(false); else setTimeout(stepLoop, +$('speed').value); }
+
+function setFollow(name) {
+  follow = name;
+  $('fn-panel').hidden = !name; $('fn-empty').hidden = !!name;
+  if (name) ({ width: SW, height: SH } = size(sp));
+  draw();
+}
+
+$('play').onclick = () => setPlaying(!playing);
+$('scale').onchange = draw;
+$('fn-clear').onclick = () => setFollow(null);
+const seek = e => { const r = tl.getBoundingClientRect(); pos = Math.max(0, Math.min(N - 1, (e.clientX - r.left) / r.width * (N - 1))); draw(); };
+tl.addEventListener('pointerdown', e => { setPlaying(false); seek(e); tl.setPointerCapture(e.pointerId); });
+tl.addEventListener('pointermove', e => { if (e.buttons) seek(e); });
+tl.addEventListener('pointerup', () => { pos = Math.round(pos); draw(); });
+tl.addEventListener('keydown', e => {
+  if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+  setPlaying(false); pos = Math.max(0, Math.min(N - 1, Math.round(pos) + (e.key === 'ArrowRight' ? 1 : -1))); draw(); e.preventDefault();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === ' ' && e.target === document.body) { setPlaying(!playing); e.preventDefault(); }
+  if (e.key === 'Escape') setFollow(null);
+});
+
+const tip = $('tip');
+const hit = e => { const r = fl.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  return { r, x, y, q: rects.find(q => x >= q.x && x < q.x + q.w && y >= q.y && y < q.y + ROW) }; };
+fl.addEventListener('pointermove', e => {
+  const { r, x, y, q } = hit(e);
+  hover = q ? q.n : null;
+  if (q) {
+    const i = Math.round(pos), v = q.n.vals[i], prev = i ? q.n.vals[i - 1] : 0;
+    tip.replaceChildren();
+    const a = document.createElement('div'); a.className = 'fn'; a.textContent = q.n.name;
+    const b = document.createElement('div'); b.className = 'm';
+    b.textContent = `${fmt(v)} instructions including what it calls, ${(v / F[i].total * 100).toFixed(1)}% of the run`
+      + (i && prev ? `. ${fmtPct(pct(prev, v))} vs previous commit.` : '.');
+    const c = document.createElement('div'); c.className = 'm'; c.textContent = 'Click to follow this function over time.';
+    tip.append(a, b, c);
+    tip.style.display = 'block';
+    tip.style.left = Math.max(0, Math.min(x + 14, r.width - 430)) + 'px';
+    tip.style.top = Math.max(0, y - 74) + 'px';
+  } else tip.style.display = 'none';
+  if (!playing) drawFlame();
+});
+fl.addEventListener('pointerleave', () => { hover = null; tip.style.display = 'none'; if (!playing) drawFlame(); });
+fl.addEventListener('click', e => { const { q } = hit(e); setFollow(q ? (follow === q.n.name ? null : q.n.name) : null); });
+
+addEventListener('resize', resize);
+document.fonts.ready.then(resize);
+resize();
+}
+</script>
+</body>
+</html>

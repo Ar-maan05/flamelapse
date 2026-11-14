@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flamelapse</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 22'%3E%3Crect x='1' y='15' width='20' height='5' rx='1.5' fill='%232a78d6'/%3E%3Crect x='3' y='9' width='11' height='5' rx='1.5' fill='%23eb6834'/%3E%3Crect x='5' y='3' width='6' height='5' rx='1.5' fill='%231baf7a'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wdth,wght@75..100,400..700&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: light;
+  --surface: #fcfcfb;
+  --card: #ffffff;
+  --sunken: #f2f2ef;
+  --line: #e4e3df;
+  --grid: #ecebe7;
+  --text: #0b0b0b;
+  --text-2: #52514e;
+  --text-3: #7a7974;
+  --focus: #2a78d6;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #a3a29c;
+  --shadow: 0 1px 2px rgba(20, 20, 18, 0.05), 0 8px 24px rgba(20, 20, 18, 0.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --surface: #1a1a19; --card: #222220; --sunken: #2a2a28; --line: #353532; --grid: #2e2e2b;
+    --text: #f0efec; --text-2: #c3c2b7; --text-3: #918f86; --focus: #3987e5;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #6f6e68;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--surface); color: var(--text);
+  font-family: "Instrument Sans", system-ui, sans-serif; font-size: 16px; line-height: 1.5;
+  font-variant-numeric: tabular-nums; }
+a { color: inherit; text-underline-offset: 3px; text-decoration-color: var(--text-3); }
+a:hover { text-decoration-color: currentColor; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 32px; }
+
+/* top bar */
+.bar { display: flex; align-items: center; justify-content: space-between; padding: 22px 0 0; }
+.brand { font-weight: 700; font-size: 17px; letter-spacing: -0.01em; display: flex; align-items: center; gap: 10px; }
+.brand svg { display: block; }
+.bar nav { display: flex; gap: 22px; font-size: 15px; color: var(--text-2); align-items: center; }
+.switch { display: inline-flex; background: var(--sunken); border-radius: 999px; padding: 3px; gap: 2px; }
+.switch[hidden] { display: none; }
+.switch a { text-decoration: none; padding: 3px 14px; border-radius: 999px; font-weight: 600; color: var(--text-2); }
+.switch a[aria-current="page"] { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
+
+/* intro */
+.intro { padding: 56px 0 36px; max-width: 860px; }
+.intro h1 { font-size: clamp(34px, 5.2vw, 60px); line-height: 1.04; letter-spacing: -0.035em; font-weight: 650;
+  font-stretch: 92%; margin: 0 0 20px; text-wrap: balance; }
+.intro p { font-size: 19px; color: var(--text-2); margin: 0; max-width: 64ch; text-wrap: pretty; }
+.intro p + p { margin-top: 10px; }
+.intro strong { color: var(--text); font-weight: 600; }
+
+/* main: chart + panel */
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+.chart-card { padding: 20px 8px 14px 22px; }
+.chart-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-right: 14px; flex-wrap: wrap; }
+.chart-head h2 { font-size: 17px; font-weight: 600; margin: 0; }
+.chart-head .sub { font-size: 14px; color: var(--text-3); margin: 2px 0 0; }
+.play { display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: 15px; font-weight: 600;
+  color: var(--surface); background: var(--text); border: 0; border-radius: 999px; padding: 9px 18px 9px 14px; cursor: pointer; }
+.play:hover { opacity: 0.88; }
+.play svg { width: 14px; height: 14px; fill: currentColor; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 14px 0 4px; font-size: 14px; color: var(--text-2); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.sw { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+#chart { display: block; width: 100%; height: 440px; touch-action: pan-y; }
+#chart:focus-visible { outline-offset: 4px; }
+.axis text { font-size: 12px; fill: var(--text-3); }
+.band-label { font-size: 13px; fill: var(--text-2); }
+.band-label tspan.v { fill: var(--text-3); }
+.pin circle { fill: var(--card); stroke: var(--text); stroke-width: 1.5; }
+.pin text { font-size: 11px; font-weight: 700; fill: var(--text); text-anchor: middle; dominant-baseline: central; }
+.pin.on circle { fill: var(--text); }
+.pin.on text { fill: var(--card); }
+.pin { cursor: pointer; }
+#tip { position: fixed; pointer-events: none; z-index: 10; background: var(--card); border: 1px solid var(--line);
+  border-radius: 10px; box-shadow: var(--shadow); padding: 10px 12px; font-size: 13px; width: 260px; display: none; }
+#tip .d { color: var(--text-3); }
+#tip .s { margin: 2px 0 6px; font-weight: 600; font-size: 14px; line-height: 1.3; }
+#tip .t { font-size: 13px; color: var(--text-2); }
+
+/* selected version panel */
+.panel { padding: 22px 22px 18px; position: sticky; top: 16px; }
+.panel .when { font-size: 14px; color: var(--text-3); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tag { font-size: 12px; font-weight: 600; color: var(--text); background: var(--sunken); border-radius: 999px; padding: 1px 9px; }
+.panel .subject { font-size: 15px; font-weight: 600; margin: 6px 0 16px; line-height: 1.35; min-height: 2.7em; }
+.panel .big { font-size: 44px; font-weight: 650; letter-spacing: -0.03em; line-height: 1; font-stretch: 92%; }
+.panel .big small { font-size: 15px; font-weight: 500; color: var(--text-3); letter-spacing: 0; margin-left: 6px; }
+.panel .vs { font-size: 14px; color: var(--text-2); margin: 8px 0 18px; }
+.panel .vs b { font-weight: 600; color: var(--text); }
+.rows { display: grid; gap: 12px; }
+.row .top { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
+.row .top span:first-child { display: inline-flex; align-items: center; gap: 7px; }
+.row .top .num { color: var(--text-2); }
+.track { height: 6px; background: var(--sunken); border-radius: 999px; margin-top: 5px; overflow: hidden; }
+.fill { height: 100%; border-radius: 999px; transition: width 0.25s ease-out; }
+.panel .changed { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 14px; color: var(--text-2); }
+.panel .changed b { color: var(--text); font-weight: 600; }
+.panel .links { margin-top: 14px; font-size: 14px; display: flex; gap: 16px; flex-wrap: wrap; }
+
+/* moments */
+.moments { padding: 64px 0 24px; }
+.section-title { font-size: 28px; letter-spacing: -0.02em; font-weight: 650; margin: 0 0 6px; }
+.section-sub { color: var(--text-2); margin: 0 0 24px; max-width: 64ch; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
+.moment { padding: 20px 20px 18px; text-align: left; font: inherit; color: inherit; cursor: pointer; width: 100%;
+  display: flex; flex-direction: column; gap: 10px; transition: transform 0.15s ease, border-color 0.15s ease; }
+.moment:hover { transform: translateY(-2px); border-color: var(--text-3); }
+.moment[aria-current="true"] { border-color: var(--text); box-shadow: 0 0 0 1px var(--text), var(--shadow); }
+.m-top { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text-3); }
+.m-num { width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--text); color: var(--text);
+  font-size: 12px; font-weight: 700; display: grid; place-items: center; flex: none; }
+.m-pct { margin-left: auto; font-size: 22px; font-weight: 650; color: var(--text); letter-spacing: -0.02em; }
+.m-head { font-size: 18px; font-weight: 600; line-height: 1.3; display: flex; align-items: center; gap: 8px; }
+.m-note { font-size: 15px; color: var(--text-2); margin: 0; text-wrap: pretty; }
+.m-commit { font-size: 13px; color: var(--text-3); margin-top: auto; padding-top: 6px; }
+.footnote { font-size: 14px; color: var(--text-3); margin-top: 18px; }
+
+/* about */
+.about { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 32px; padding: 48px 0 80px;
+  border-top: 1px solid var(--line); margin-top: 48px; }
+.about h3 { font-size: 16px; margin: 0 0 6px; font-weight: 600; }
+.about p { margin: 0; color: var(--text-2); font-size: 15px; }
+.about code, .about pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; }
+.cat-help { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 15px; color: var(--text-2); }
+.cat-help li { display: grid; grid-template-columns: 11px 1fr; gap: 10px; align-items: baseline; }
+.cat-help b { color: var(--text); font-weight: 600; }
+.about pre { background: var(--sunken); border-radius: 8px; padding: 10px 12px; white-space: pre-wrap; margin: 10px 0 0; color: var(--text); }
+
+@media (max-width: 1020px) {
+  .main { grid-template-columns: minmax(0, 1fr); }
+  .panel { position: static; }
+}
+@media (max-width: 640px) {
+  .wrap { padding: 0 16px; }
+  .intro { padding: 36px 0 24px; }
+  .intro p { font-size: 17px; }
+  .chart-card { padding: 16px 4px 10px 12px; }
+  #chart { height: 340px; }
+  .bar nav a:not(.switch a) { display: none; }
+  .grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fill, .moment { transition: none; }
+}
+.hint-touch { display: none; }
+.table-view { margin-top: 14px; font-size: 13px; }
+.table-view summary { cursor: pointer; color: var(--text-2); width: max-content; }
+.table-view summary:hover { color: var(--text); }
+.table-scroll { overflow: auto; max-height: 420px; margin-top: 10px; border-top: 1px solid var(--line); }
+.table-view table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.table-view th, .table-view td { padding: 6px 10px 6px 0; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+.table-view th { position: sticky; top: 0; background: var(--card); font-weight: 600; color: var(--text-2); }
+.table-view th:nth-child(-n+2), .table-view td:first-child, .table-view td.subj { text-align: left; }
+.table-view td.subj { white-space: normal; min-width: 220px; color: var(--text-2); }
+@media (hover: none) { .hint-mouse { display: none; } .hint-touch { display: inline; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="15" width="20" height="5" rx="1.5" fill="var(--s1)"/><rect x="3" y="9" width="11" height="5" rx="1.5" fill="var(--s2)"/><rect x="5" y="3" width="6" height="5" rx="1.5" fill="var(--s3)"/></svg>
+      Flamelapse
+    </div>
+    <nav><span class="switch" id="switch" aria-label="Project"></span><a href="#moments">Moments</a><a href="#about">How it works</a><a id="nav-flame" href="flame.html">Flame graph</a></nav>
+  </div>
+
+  <section class="intro">
+    <h1 id="headline"></h1>
+    <p id="lede"></p>
+    <p id="lede2"></p>
+  </section>
+
+  <div class="main">
+    <section class="card chart-card" aria-labelledby="chart-title">
+      <div class="chart-head">
+        <div>
+          <h2 id="chart-title">Work done per run, by kind of work</h2>
+          <p class="sub"><span id="sub-proj"></span> Lower is faster. <span class="hint-mouse">Hover to inspect, click to select.</span><span class="hint-touch">Tap a point to see that version.</span></p>
+        </div>
+        <button class="play" id="play"><svg viewBox="0 0 14 14" id="play-icon"><path d="M3 1.5v11l9-5.5z"/></svg><span id="play-label">Play the history</span></button>
+      </div>
+      <div class="legend" id="legend"></div>
+      <svg id="chart" tabindex="0" role="img" aria-label="Stacked area chart of instructions per version, by kind of work. Use the left and right arrow keys to move between versions."></svg>
+      <details class="table-view" id="table-view"><summary>Show the numbers as a table</summary><div class="table-scroll"><table id="table"></table></div></details>
+    </section>
+
+    <aside class="card panel" aria-live="polite">
+      <div class="when" id="p-when"></div>
+      <div class="subject" id="p-subject"></div>
+      <div class="big" id="p-total"></div>
+      <div class="vs" id="p-vs"></div>
+      <div class="rows" id="p-rows"></div>
+      <div class="changed" id="p-changed" hidden></div>
+      <div class="links"><a id="p-link" target="_blank" rel="noopener">View this commit</a><a id="p-flame">See every function</a></div>
+    </aside>
+  </div>
+
+  <section class="moments" id="moments">
+    <h2 class="section-title">Moments that mattered</h2>
+    <p class="section-sub">Each of these changes moved the total by 2% or more. We measured every commit in between, so each one is pinned to exactly one commit or merged pull request.</p>
+    <div class="grid" id="grid"></div>
+    <p class="footnote" id="footnote"></p>
+  </section>
+
+  <section class="about" id="about">
+    <div>
+      <h3>What we measured</h3>
+      <p id="workload-intro"></p>
+      <pre id="workload"></pre>
+    </div>
+    <div>
+      <h3>Why instructions, not seconds</h3>
+      <p>We count the CPU instructions each run executes, using Valgrind. Two runs of the same version agree to within 0.02%, so every bump in the chart is a real change in the code, not a noisy machine.</p>
+    </div>
+    <div>
+      <h3>How the kinds of work are grouped</h3>
+      <ul id="cat-help" class="cat-help"></ul>
+    </div>
+  </section>
+</div>
+<div id="tip" role="tooltip"></div>
+
+<script src="projects.js"></script>
+<script>
+const PROJECTS = (window.FLAMELAPSE_PROJECTS || []).map(p => p.key);
+const asked = new URLSearchParams(location.search).get('p');
+const PROJ = PROJECTS.includes(asked) ? asked : PROJECTS[0];
+if (!PROJ) document.body.innerHTML = '<p style="padding:40px;font:16px system-ui">No projects in this report yet. Run <code>flamelapse run</code>.</p>';
+else { const loader = document.createElement('script'); loader.src = `data-${PROJ}.js`; loader.onload = () => start(); document.head.append(loader); }
+function start() {
+const D = window.FLAMELAPSE, F = D.frames, N = F.length;
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const SVGNS = 'http://www.w3.org/2000/svg';
+const sv = (tag, attrs = {}, parent) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.append(e); return e; };
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Kinds of work that matter in this run (at least 0.5% of some version), fixed order.
+const ALL = D.cats.map((c, k) => ({ ...c, k }));
+const CATS = ALL.filter(c => F.some(f => f.cats[c.k] >= 0.005 * f.total));
+const color = c => c.key === 'other' ? 'var(--s7)' : `var(--s${Math.min(CATS.indexOf(c) + 1, 6)})`;
+const time = F.map(f => new Date(f.date).getTime());
+const pct = (a, b) => (b - a) / a * 100;
+const fmtB = v => (v / 1e9).toFixed(2) + 'B';
+const fmtM = v => Math.abs(v) >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : Math.round(v / 1e6) + 'M';
+const signed = (v, f) => (v > 0 ? '+' : v < 0 ? '-' : '') + f(Math.abs(v));
+const pctStr = r => signed(r, x => x.toFixed(Math.abs(x) < 10 ? 1 : 0) + '%');
+const monthYear = t => new Date(t).toLocaleDateString('en', { month: 'short', year: 'numeric' });
+const fullDate = t => new Date(t).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' });
+const repo = D.about.repo ? D.about.repo + '/commit/' : null;
+document.title = `${D.project} - Flamelapse`;
+$('sub-proj').textContent = `Each point is one version of ${D.project}.`;
+$('workload-intro').textContent = D.about.workload_intro;
+if (PROJECTS.length < 2) $('switch').hidden = true;
+for (const p of window.FLAMELAPSE_PROJECTS) { const a = el('a', '', p.name); a.href = `?p=${p.key}`; if (p.key === PROJ) a.setAttribute('aria-current', 'page'); $('switch').append(a); }
+$('nav-flame').href = $('p-flame').href = `flame.html?p=${PROJ}`;
+
+// ---------- the same numbers as a table ----------
+$('table-view').addEventListener('toggle', function build() {
+  if (!this.open || $('table').childElementCount) return;
+  const t = $('table'), head = el('tr');
+  for (const h of ['Date', 'Version', ...CATS.map(c => c.label), 'Total']) head.append(el('th', '', h));
+  t.appendChild(el('thead')).append(head);
+  const body = t.appendChild(el('tbody'));
+  F.forEach((f, i) => {
+    const tr = el('tr');
+    tr.append(el('td', '', fullDate(time[i])), el('td', 'subj', (f.tag ? f.tag + ': ' : '') + (f.pr ? f.pr + ' ' : '') + f.subject));
+    for (const c of CATS) tr.append(el('td', '', fmtM(f.cats[c.k])));
+    tr.append(el('td', '', fmtM(f.total)));
+    body.append(tr);
+  });
+});
+
+// ---------- story text ----------
+const first = F[0], lastF = F[N - 1];
+const totalChange = pct(first.total, lastF.total);
+const catDelta = CATS.map(c => ({ c, d: lastF.cats[c.k] - first.cats[c.k], r: pct(first.cats[c.k] || 1, lastF.cats[c.k]) }));
+const worst = catDelta.slice().sort((a, b) => totalChange >= 0 ? b.d - a.d : a.d - b.d)[0];
+$('headline').textContent = Math.abs(totalChange) < 1
+  ? `${D.project} does about the same work today as it did in ${new Date(time[0]).getFullYear()}.`
+  : `${D.project} does ${Math.round(Math.abs(totalChange))}% ${totalChange > 0 ? 'more' : 'less'} work on this task than it did in ${new Date(time[0]).getFullYear()}.`;
+$('lede').textContent = `We built ${N} versions of ${D.project}, from ${monthYear(time[0])} to ${monthYear(time[N - 1])}, ran each one on the same job and counted every CPU instruction it executed. Less work means a faster program.`;
+const lede2 = $('lede2');
+if (worst && worst.d > 0 && totalChange > 0) {
+  lede2.append('The biggest increase is in ');
+  lede2.append(el('strong', '', worst.c.label));
+  lede2.append(`: it now takes ${Math.round(worst.r)}% more instructions than it did in ${new Date(time[0]).getFullYear()}.`);
+} else if (worst && worst.d < 0 && totalChange < 0) {
+  lede2.append('The biggest saving is in ');
+  lede2.append(el('strong', '', worst.c.label));
+  lede2.append(`: it now takes ${Math.round(-worst.r)}% fewer instructions than it did in ${new Date(time[0]).getFullYear()}.`);
+}
+$('workload').textContent = D.workload;
+for (const c of CATS) {
+  const li = el('li'), sw = el('span', 'sw'); sw.style.background = color(c);
+  li.append(sw, el('span', '', ''));
+  li.lastChild.append(el('b', '', c.label + '. '), c.desc);
+  $('cat-help').append(li);
+}
+
+// ---------- legend ----------
+for (const c of CATS) { const s = el('span'); const w = el('span', 'sw'); w.style.background = color(c); s.append(w, c.label); $('legend').append(s); }
+
+// ---------- moments ----------
+const moments = [];
+for (let i = 1; i < N; i++) {
+  const r = pct(F[i - 1].total, F[i].total);
+  if (Math.abs(r) < 2 || !F[i].direct) continue;
+  const deltas = CATS.map(c => ({ c, d: F[i].cats[c.k] - F[i - 1].cats[c.k] })).sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
+  moments.push({ i, r, top: deltas[0] });
+}
+moments.forEach((m, n) => m.n = n + 1);
+const unpinned = [];
+for (let i = 1; i < N; i++) { const r = pct(F[i - 1].total, F[i].total); if (Math.abs(r) >= 2 && !F[i].direct) unpinned.push(i); }
+const grid = $('grid');
+for (const m of moments) {
+  const f = F[m.i];
+  const b = el('button', 'card moment'); b.dataset.i = m.i;
+  const top = el('div', 'm-top');
+  top.append(el('span', 'm-num', m.n), el('span', '', fullDate(time[m.i])), el('span', 'm-pct', pctStr(m.r)));
+  const head = el('div', 'm-head');
+  const sw = el('span', 'sw'); sw.style.background = color(m.top.c);
+  head.append(sw, `${m.top.c.label} got ${m.top.d > 0 ? 'slower' : 'faster'}`);
+  b.append(top, head);
+  if (f.note) b.append(el('p', 'm-note', f.note));
+  b.append(el('div', 'm-commit', `${f.pr || 'Commit ' + f.sha.slice(0, 8)}: "${f.subject}"`));
+  b.onclick = () => { stop(); select(m.i); document.querySelector('.main').scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' }); };
+  grid.append(b);
+}
+if (unpinned.length) $('footnote').textContent = `${unpinned.length} smaller ${unpinned.length > 1 ? 'changes' : 'change'} could not be pinned to a single commit.`;
+
+// ---------- chart ----------
+const svg = $('chart');
+let W = 0, H = 0, X, Y, plot, yStep = 5e8;
+const M = { top: 36, right: 168, bottom: 30, left: 44 };
+let sel = N - 1, hoverI = null;
+
+function layout() {
+  const r = svg.getBoundingClientRect(); W = r.width; H = r.height;
+  const narrow = W < 560;
+  M.right = narrow ? 12 : 168;
+  plot = { x0: M.left, x1: W - M.right, y0: M.top, y1: H - M.bottom };
+  const t0 = time[0], t1 = time[N - 1];
+  X = t => plot.x0 + (t - t0) / (t1 - t0) * (plot.x1 - plot.x0);
+  const maxT = Math.max(...F.map(f => f.total));
+  const raw = maxT / 5, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  yStep = [1, 2, 2.5, 5, 10].map(m => m * mag).find(v => v >= raw);
+  const yMax = Math.ceil(maxT / yStep) * yStep;
+  Y = v => plot.y1 - v / yMax * (plot.y1 - plot.y0);
+  return { yMax, narrow };
+}
+
+function render() {
+  const { yMax, narrow } = layout();
+  svg.replaceChildren();
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  // grid + y axis
+  const ax = sv('g', { class: 'axis' }, svg);
+  for (let v = 0; v <= yMax + 1; v += yStep) {
+    sv('line', { x1: plot.x0, x2: plot.x1, y1: Y(v), y2: Y(v), stroke: 'var(--grid)', 'stroke-width': 1 }, ax);
+    const t = sv('text', { x: plot.x0 - 8, y: Y(v) + 4, 'text-anchor': 'end' }, ax); t.textContent = !v ? '0' : v >= 1e9 ? (v / 1e9).toFixed(yStep >= 1e9 ? 0 : 1) + 'B' : Math.round(v / 1e6) + 'M';
+  }
+  // x axis: years
+  const y0 = new Date(time[0]).getFullYear(), y1 = new Date(time[N - 1]).getFullYear();
+  const step = narrow ? 3 : 1;
+  for (let y = y0 + 1; y <= y1; y += step) {
+    const x = X(new Date(y, 0, 1).getTime());
+    const t = sv('text', { x, y: plot.y1 + 20, 'text-anchor': 'middle' }, ax); t.textContent = y;
+  }
+  // stacked areas
+  const cum = F.map(() => 0);
+  const bands = [];
+  for (const c of CATS) {
+    const lo = cum.slice(), hi = F.map((f, i) => (cum[i] += f.cats[c.k]));
+    let d = `M${X(time[0])},${Y(hi[0])}`;
+    for (let i = 1; i < N; i++) d += `L${X(time[i])},${Y(hi[i])}`;
+    for (let i = N - 1; i >= 0; i--) d += `L${X(time[i])},${Y(lo[i])}`;
+    sv('path', { d: d + 'Z', fill: color(c), stroke: 'var(--card)', 'stroke-width': 1.5, 'stroke-linejoin': 'round' }, svg);
+    bands.push({ c, lo, hi });
+  }
+  // direct labels at the right edge, pushed apart so they never overlap
+  if (!narrow) {
+    const labels = bands.map(b => ({ b, y: Y((b.lo[N - 1] + b.hi[N - 1]) / 2) })).sort((a, b) => a.y - b.y);
+    for (let k = 1; k < labels.length; k++) labels[k].y = Math.max(labels[k].y, labels[k - 1].y + 17);
+    for (let k = labels.length - 2; k >= 0; k--) labels[k].y = Math.min(labels[k].y, labels[k + 1].y - 17);
+    for (const L of labels) {
+      sv('rect', { x: plot.x1 + 10, y: L.y - 5, width: 10, height: 10, rx: 2.5, fill: color(L.b.c) }, svg);
+      const t = sv('text', { class: 'band-label', x: plot.x1 + 26, y: L.y + 4 }, svg);
+      t.textContent = L.b.c.label.length > 20 ? L.b.c.label.split(' ')[0] : L.b.c.label;
+    }
+  }
+  // release tags as faint ticks on the x axis
+  F.forEach((f, i) => { if (f.tag) sv('line', { x1: X(time[i]), x2: X(time[i]), y1: plot.y1, y2: plot.y1 + 5, stroke: 'var(--text-3)' }, ax); });
+  // cursor line (selection) and hover line
+  svg.append(sv('line', { id: 'sel-line', y1: plot.y0 - 4, y2: plot.y1, stroke: 'var(--text)', 'stroke-width': 1.5 }));
+  svg.append(sv('line', { id: 'hov-line', y1: plot.y0 - 4, y2: plot.y1, stroke: 'var(--text-3)', 'stroke-width': 1, 'stroke-dasharray': '3 3', visibility: 'hidden' }));
+  // pins, spread so neighbours never overlap
+  const pins = moments.map(m => ({ m, x: X(time[m.i]) }));
+  for (let k = 1; k < pins.length; k++) pins[k].x = Math.max(pins[k].x, pins[k - 1].x + 24);
+  for (let k = pins.length - 1; k >= 0; k--) pins[k].x = Math.min(pins[k].x, (k === pins.length - 1 ? W - 14 : pins[k + 1].x - 24));
+  for (const p of pins) {
+    const yTop = Y(F[p.m.i].total);
+    const g = sv('g', { class: 'pin', 'data-i': p.m.i, tabindex: -1 }, svg);
+    sv('line', { x1: X(time[p.m.i]), x2: p.x, y1: yTop - 2, y2: plot.y0 - 4, stroke: 'var(--text-3)', 'stroke-width': 1 }, g);
+    sv('circle', { cx: p.x, cy: plot.y0 - 16, r: 11 }, g);
+    const t = sv('text', { x: p.x, y: plot.y0 - 16 }, g); t.textContent = p.m.n;
+    g.addEventListener('click', e => { e.stopPropagation(); stop(); select(p.m.i); });
+  }
+  updateMarks();
+}
+
+function updateMarks() {
+  const s = svg.querySelector('#sel-line');
+  if (s) { s.setAttribute('x1', X(time[sel])); s.setAttribute('x2', X(time[sel])); }
+  for (const g of svg.querySelectorAll('.pin')) g.classList.toggle('on', +g.dataset.i === sel);
+  const h = svg.querySelector('#hov-line');
+  if (h) {
+    if (hoverI == null || hoverI === sel) h.setAttribute('visibility', 'hidden');
+    else { h.setAttribute('visibility', 'visible'); h.setAttribute('x1', X(time[hoverI])); h.setAttribute('x2', X(time[hoverI])); }
+  }
+}
+
+const nearest = clientX => {
+  const r = svg.getBoundingClientRect(), x = clientX - r.left;
+  let best = 0, bd = Infinity;
+  for (let i = 0; i < N; i++) { const d = Math.abs(X(time[i]) - x); if (d < bd) { bd = d; best = i; } }
+  return best;
+};
+const tip = $('tip');
+svg.addEventListener('pointermove', e => {
+  if (e.target.closest('.pin')) { hoverI = null; tip.style.display = 'none'; updateMarks(); return; }
+  hoverI = nearest(e.clientX); updateMarks();
+  const f = F[hoverI];
+  tip.replaceChildren();
+  tip.append(el('div', 'd', fullDate(time[hoverI]) + (f.tag ? `, ${f.tag}` : '')), el('div', 's', f.subject));
+  const prev = hoverI ? pct(F[hoverI - 1].total, f.total) : 0;
+  tip.append(el('div', 't', `${fmtB(f.total)} instructions` + (hoverI && Math.abs(prev) >= 0.1 ? `, ${pctStr(prev)} vs the version before` : '')));
+  tip.style.display = 'block';
+  const tw = 260, x = e.clientX + 16 + tw > innerWidth ? e.clientX - tw - 16 : e.clientX + 16;
+  tip.style.left = x + 'px'; tip.style.top = Math.max(8, e.clientY - 40) + 'px';
+});
+svg.addEventListener('pointerleave', () => { hoverI = null; tip.style.display = 'none'; updateMarks(); });
+svg.addEventListener('click', e => { stop(); select(nearest(e.clientX)); });
+svg.addEventListener('keydown', e => {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  e.preventDefault(); stop(); select(Math.max(0, Math.min(N - 1, sel + (e.key === 'ArrowRight' ? 1 : -1))));
+});
+
+// ---------- selected version panel ----------
+const maxTotal = Math.max(...F.map(f => f.total));
+const rows = CATS.map(c => {
+  const row = el('div', 'row'), top = el('div', 'top'), name = el('span'), sw = el('span', 'sw');
+  sw.style.background = color(c); name.append(sw, c.label);
+  const num = el('span', 'num'); top.append(name, num);
+  const track = el('div', 'track'), fill = el('div', 'fill'); fill.style.background = color(c); track.append(fill);
+  row.title = c.desc; row.append(top, track); $('p-rows').append(row);
+  return { c, num, fill };
+});
+let shownTotal = F[N - 1].total, animFrom = shownTotal, animTo = shownTotal, animStart = 0;
+function tweenTotal(t) {
+  const k = Math.min(1, (t - animStart) / 350), e = 1 - Math.pow(1 - k, 3);
+  shownTotal = animFrom + (animTo - animFrom) * e;
+  $('p-total').firstChild.nodeValue = fmtB(shownTotal);
+  if (k < 1) requestAnimationFrame(tweenTotal);
+}
+$('p-total').append(document.createTextNode(''), el('small', '', 'instructions'));
+
+function select(i) {
+  sel = i;
+  const f = F[i];
+  const when = $('p-when'); when.replaceChildren();
+  when.append(fullDate(time[i])); if (f.tag) when.append(el('span', 'tag', f.tag));
+  $('p-subject').textContent = f.subject;
+  animFrom = shownTotal; animTo = f.total; animStart = performance.now();
+  const settle = () => { if (animTo === f.total) { shownTotal = f.total; $('p-total').firstChild.nodeValue = fmtB(f.total); } };
+  if (reduceMotion || document.hidden) settle(); else { requestAnimationFrame(tweenTotal); setTimeout(settle, 400); }
+  const vs = $('p-vs'); vs.replaceChildren();
+  if (i === 0) vs.append('The oldest version we could build.');
+  else { const r = pct(F[0].total, f.total); vs.append(el('b', '', pctStr(r)), ` compared with ${monthYear(time[0])}`); }
+  for (const r of rows) {
+    const v = f.cats[r.c.k];
+    const share = v / f.total * 100;
+    r.num.textContent = `${fmtM(v)}, ${share < 1 ? '<1' : Math.round(share)}%`;
+    r.fill.style.width = (v / maxTotal * 100) + '%';
+  }
+  const m = moments.find(m => m.i === i), ch = $('p-changed');
+  if (m) {
+    ch.hidden = false; ch.replaceChildren();
+    ch.append(el('b', '', `${pctStr(m.r)} in this commit. `), f.note || `${m.top.c.label} got ${m.top.d > 0 ? 'slower' : 'faster'}.`);
+  } else ch.hidden = true;
+  $('p-link').hidden = !repo; if (repo) $('p-link').href = repo + f.sha;
+  for (const b of grid.querySelectorAll('.moment')) b.setAttribute('aria-current', String(+b.dataset.i === i));
+  updateMarks();
+}
+
+// ---------- playback: walk through history, pausing on each moment ----------
+let timer = null;
+function stop() { if (timer) clearTimeout(timer); timer = null; setPlayUI(false); }
+function setPlayUI(p) {
+  $('play-label').textContent = p ? 'Pause' : 'Play the history';
+  $('play-icon').innerHTML = p ? '<path d="M3 1.5h3v11H3zM8 1.5h3v11H8z"/>' : '<path d="M3 1.5v11l9-5.5z"/>';
+}
+function stepPlay() {
+  if (sel >= N - 1) { stop(); return; }
+  select(sel + 1);
+  const isMoment = moments.some(m => m.i === sel);
+  timer = setTimeout(stepPlay, isMoment ? 2200 : reduceMotion ? 400 : 110);
+}
+$('play').onclick = () => {
+  if (timer) { stop(); return; }
+  setPlayUI(true);
+  if (sel >= N - 1) select(0);
+  timer = setTimeout(stepPlay, 300);
+};
+
+let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(render, 80); });
+document.fonts.ready.then(render);
+render();
+select(N - 1);
+}
+</script>
+</body>
+</html>
